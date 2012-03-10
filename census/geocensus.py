@@ -19,7 +19,7 @@ class GeoCensus():
 
     pgconn = None
     GCHARTURL = "http://chart.apis.google.com/chart"
-    GEO_AVAIL = ["coast", "dc", "dc_land", "dcca", "tpu_small", "tpu_large", "tpu", "tpusb_small", "dist_nt"]
+    GEO_AVAIL = ["coast", "dc", "dc_land", "dcca", "tpu_small", "tpu_large", "tpu", "tsb_small", "dist_nt"]
     GEO_KEYS = {"dc_land2": "dc"}
 
     def __init__(self, geo=None):
@@ -31,13 +31,17 @@ class GeoCensus():
 	    self.geotable = geo
     	    if geo in self.GEO_KEYS:
     		self.key = self.GEO_KEYS[geo]
+		self.geokey = self.GEO_KEYS[geo]
     	    else:
     		self.key = geo
+		self.geokey = geo
+	self.datatable = None
 	self.geokml = dict()
 	self.data = dict()
 	self.factory = kmldom.KmlFactory_GetFactory()
 	self.kml = self.factory.CreateElementById(kmldom.Type_kml)
 	self.geo = None
+	self.geokey = None
 	self.geo_tolerance = None
 	self.output = None
 	self.verbose = False
@@ -52,20 +56,33 @@ class GeoCensus():
 	if self.key is None:
 	    if geo in self.GEO_KEYS:
 		self.key = self.GEO_KEYS[geo]
+		self.geokey = self.GEO_KEYS[geo]
 	    else:
 		self.key = geo
+		self.geokey = geo
 
     def setGeoTolerance(self, tolerance):
 	self.geo_tolerance = str(tolerance)
 
     def geodb(self):
 	if self.geotable is None:
-	    return 0
+	    if self.datatable is not None and len(self.data) > 0:
+		geokey = self.pgconn.pkey("hkcensus.%s" % self.datatable)
+		if type(geokey).__name__ == "frozenset":
+		    for x in geokey:
+			self.geokey = x
+			break
+		if geokey in self.GEO_AVAIL:
+		    self.setGeo(geokey)
+		else:
+		    return 0
+	    else:
+		return 0
 	if self.geo_tolerance is not None:
 	    the_geom = "ST_SimplifyPreserveTopology(the_geom,%(tolerance)s)" % { "tolerance": self.geo_tolerance }
 	else:
 	    the_geom = "the_geom"
-	sql_args = { "table_name": "hkcensus." + self.geotable, "orderby": self.key, "key": self.key, "the_geom": the_geom }
+	sql_args = { "table_name": "hkcensus." + self.geotable, "orderby": self.geokey, "key": self.geokey, "the_geom": the_geom }
 	sql = "SELECT %(key)s, ST_AsKML(%(the_geom)s) boundary, ST_AsKML(ST_Centroid(the_geom)) point FROM %(table_name)s ORDER BY %(orderby)s "
 	if self.verbose:
 	    print sql % sql_args
@@ -74,23 +91,36 @@ class GeoCensus():
 	    self.geokml[x[self.key]] = x
 
     def getCensusData(self, datatable_name, keys=list()):
+	self.datatable = datatable_name
+    	datakey = self.pgconn.pkey("hkcensus.%s" % self.datatable)
+	if self.key is None:
+	    if type(datakey).__name__ == "frozenset":
+		self.key = ",".join(datakey)
+		for x in datakey:
+		    self.geokey = x
+		    break
+	    elif type(datakey) is types.StringType:
+		self.key = datakey
+		self.geokey = datakey
 	sql_args = { "table_name": "hkcensus." + datatable_name, "in": "", "orderby": self.key, "key": self.key }
 	keys_str = list()
 	for k in keys:
 	    keys_str.append(str(k))
-	if len(keys) > 0 and len(primary_key) > 0:
-	    sql_args["in"] = " WHERE %(key)s IN (%(ids)s) " % { "key": self.key, "ids": ",".join(keys_str) }
+	#if len(keys) > 0 and len(primary_key) > 0:
+	#    sql_args["in"] = " WHERE %(key)s IN (%(ids)s) " % { "key": self.key, "ids": ",".join(keys_str) }
 	sql = "SELECT * FROM %(table_name)s %(in)s ORDER BY %(orderby)s "
-	resdata = self.pgconn.query(sql % sql_args).dictresult()
 	print sql % sql_args
+	resdata = self.pgconn.query(sql % sql_args).dictresult()
 	for x in resdata:
 	    self.data[x[self.key]] = x
-
-    def genCsv(self):
+    
+    def genText(self, outformat="csv"):
 	if self.verbose:
-	    print "generating CSV..."
-	#req.content_type = "application/vnd.ms-excel"
-	cols = [self.key]
+	    print "generating %s..." % outformat.upper()
+	if "," in self.key:
+	    cols = self.key.split(",")
+	else:
+	    cols = [self.key]
 	if len(self.data) > 0:
 	    datacols = self.data[self.data.keys()[0]].keys()
 	    datacols.sort()
@@ -101,30 +131,65 @@ class GeoCensus():
 	if self.output is None:
 	    out = sys.stdout
 	else:
-	    out = open(self.output, "a")
+	    out = open(self.output, "w")
 	if self.verbose:
 	    print cols
-	cw = csv.DictWriter(out, cols)
-	cw.writeheader()
+	if outformat == "csv":
+	    cw = csv.DictWriter(out, cols)
+	    cw.writeheader()
+	else:
+	    txt = list()
 	if len(self.data) > 0:
 	    datakeys = self.data.keys()
 	    datakeys.sort()
 	    for x in datakeys:
 		if len(self.geokml):
-		    x_geo = self.getGeoNumber(x)
+		    row = dict() 
+		    if "," in self.key: # composite pkey
+			x_geo = self.getGeoNumber(x.split(",")[0]) # assume first is geokey
+			for k in self.key.split(","):
+			    row[k] = k
+		    else:
+			x_geo = self.getGeoNumber(x)
+			row[self.key] = x
 		    if x_geo is None:
 			continue
-		    row = { self.key: x, "point": self.geokml[x_geo]["point"], "boundary": self.geokml[x_geo]["boundary"] }
+		    row["point"] = self.geokml[x_geo]["point"]
+		    row["boundary"] = self.geokml[x_geo]["boundary"]
 		    row = dict(row.items() + self.data[x].items())
 		else:
 		    row = self.data[x]
-		cw.writerow(row)
+		if outformat == "csv":
+		    cw.writerow(row)
+		else:
+		    txt.append(row)
 	elif self.geokml is not None:
 	    geokmlkeys = self.geokml.keys()
 	    geokmlkeys.sort()
 	    for x in geokmlkeys:
-		row = { self.key: x, "point": self.geokml[x]["point"], "boundary": self.geokml[x]["boundary"] }
-		cw.writerow(row)
+		row = { self.geokey: x, "point": self.geokml[x]["point"], "boundary": self.geokml[x]["boundary"] }
+		if outformat == "csv":
+		    cw.writerow(row)
+		else:
+		    txt.append(row)
+	if len(self.data) > 0 or self.geokml is not None:
+	    if outformat == "json":
+		out.write(json.dumps(txt))
+	    elif outformat == "sql":
+		if len(self.data) > 0:
+		    tablename = self.datatable
+		elif self.geokml is not None:
+		    tablename = self.geotable
+		for r in txt:
+		    values = r.values()
+		    values_str = list()
+		    for v in values:
+			if type(v) is types.StringType:
+			    v = v.replace("'","''")
+			    v = "'%s'" % v
+			values_str.append(str(v))
+		    args = { "tablename": tablename, "keys": ",".join(r.keys()), "vals": ",".join(values_str) }
+		    out.write("INSERT INTO %(tablename)s (%(keys)s) VALUES (%(vals)s) ;\n" % args)
     
     def genKml(self):
 	if self.verbose:
@@ -133,7 +198,7 @@ class GeoCensus():
 	if self.output is None:
 	    print kmldom.SerializePretty(self.kml)
 	else:
-	    f = open(self.output, "a")
+	    f = open(self.output, "w")
 	    f.write(kmldom.SerializePretty(self.kml))
 	    f.close()
 
@@ -192,7 +257,11 @@ class GeoCensus():
 
     def gen(self):
 	if self.outputformat == "csv":
-	    self.genCsv()
+	    self.genText()
+	elif self.outputformat == "json":
+	    self.genText("json")
+	elif self.outputformat == "sql":
+	    self.genText("sql")
 	else:
 	    self.genKml()
 
@@ -215,7 +284,7 @@ class GeoCensus():
 def main():
     gc = GeoCensus()
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "chkvo:g:t:d:", ["help", "output=", "--geo", "--tolerance", "--data", "csv", "kml", "--key"])
+        opts, args = getopt.getopt(sys.argv[1:], "chjksvo:g:t:d:", ["help", "output=", "--geo", "--tolerance", "--data", "csv", "kml", "--key", "--sql", "--json"])
     except getopt.GetoptError, err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -240,6 +309,10 @@ def main():
 	    gc.getCensusData(a)
 	elif o in ("-c", "--csv"):
 	    gc.outputformat = "csv"
+	elif o in ("-s", "--sql"):
+	    gc.outputformat = "sql"
+	elif o in ("-j", "--json"):
+	    gc.outputformat = "json"
 	elif o in ("--kml"):
 	    gc.outputformat = "kml"
 	elif o in ("-k", "--key"):
