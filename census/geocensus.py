@@ -21,6 +21,7 @@ class GeoCensus():
     GCHARTURL = "http://chart.apis.google.com/chart"
     GEO_AVAIL = ["coast", "dc", "dc_land", "dcca", "tpu_small", "tpu_large", "tpu", "tsb_small", "dist_nt"]
     GEO_KEYS = {"dc_land2": "dc"}
+    GEO_W_NUMKEYS = ["tpu2006"]
 
     def __init__(self, geo=None):
 	self.pgconn = mypass.getConn()
@@ -43,6 +44,7 @@ class GeoCensus():
 	self.geo = None
 	self.geokey = None
 	self.geo_tolerance = None
+	self.geo_mapping = dict() # for TPU to TPU_(LARGE|SMALL)
 	self.output = None
 	self.verbose = False
 	self.outputformat = "csv"
@@ -56,12 +58,10 @@ class GeoCensus():
 	    self.geotable = geo
 	    if self.year is not None:
 		self.geotable += str(self.year)
-	if self.key is None:
+	if self.geokey is None:
 	    if geo in self.GEO_KEYS:
-		self.key = self.GEO_KEYS[geo]
 		self.geokey = self.GEO_KEYS[geo]
 	    else:
-		self.key = geo
 		self.geokey = geo
 
     def setYear(self, year):
@@ -73,7 +73,7 @@ class GeoCensus():
 	self.geo_tolerance = str(tolerance)
 
     def geodb(self):
-	if self.geotable is None:
+	if self.geotable is None: # if geo is not specified, try to get it from datatable
 	    if self.datatable is not None and len(self.data) > 0:
 		geokey = self.pgconn.pkey("hkcensus.%s" % self.datatable)
 		if type(geokey).__name__ == "frozenset":
@@ -98,8 +98,31 @@ class GeoCensus():
 	if self.verbose:
 	    print sql % sql_args
 	resgeo = self.pgconn.query(sql % sql_args).dictresult()
+	if self.verbose:
+	    print str(len(resgeo)) + " results"
+	    print "key: %s " % str(self.geokey)
 	for x in resgeo:
-	    self.geokml[x[self.geokey]] = x
+	    self.geokml[str(x[self.geokey])] = x
+	if self.geo_mapping is not None and len(self.geo_mapping) > 0:
+	    for g in self.geo_mapping:
+		mapping_str = list()
+		for num in self.geo_mapping[g]:
+		    if self.geotable in self.GEO_W_NUMKEYS:
+			mapping_str.append(str(num))
+		    else:
+			mapping_str.append("'%s'" % str(num))
+		nums = ",".join(mapping_str)
+		sql = "SELECT '%(keyval)s' %(key)s, ST_AsKML(%(the_geom)s) boundary, ST_AsKML(ST_Centroid(%(the_geom)s)) point FROM %(table_name)s WHERE %(key)s IN (%(nums)s) "
+		if self.geo_tolerance is not None:
+		    the_geom = "ST_SimplifyPreserveTopology(ST_UNION(the_geom),%(tolerance)s)" % { "tolerance": self.geo_tolerance }
+		else:
+		    the_geom = "ST_UNION(the_geom)"
+		sql_args = { "table_name": "hkcensus." + self.geotable, "orderby": self.geokey, "key": self.geokey, "the_geom": the_geom, "nums": nums, "keyval": g }
+		if self.verbose:
+		    print sql % sql_args
+		resgeo = self.pgconn.query(sql % sql_args).dictresult()
+		for x in resgeo:
+		    self.geokml[str(x[self.geokey])] = x
 
     def getCensusData(self, datatable_name, keys=list()):
 	self.datatable = datatable_name
@@ -107,12 +130,14 @@ class GeoCensus():
 	if self.key is None:
 	    if type(datakey).__name__ == "frozenset":
 		self.key = ",".join(datakey)
-		for x in datakey:
-		    self.geokey = x
-		    break
+		if self.geokey is None:
+		    for x in datakey:
+		        self.geokey = x
+		        break
 	    elif type(datakey) is types.StringType:
 		self.key = datakey
-		self.geokey = datakey
+		if self.geokey is None:
+		    self.geokey = datakey
 	sql_args = { "table_name": "hkcensus." + datatable_name, "in": "", "orderby": self.key, "key": self.key }
 	keys_str = list()
 	for k in keys:
@@ -131,7 +156,23 @@ class GeoCensus():
 	    else:
 		thiskey = x[self.key]
 	    self.data[thiskey] = x
-    
+	    if "," in thiskey or "&" in thiskey or "-" in thiskey:
+		geoset1 = re.sub(r"[,&]+","", thiskey).split()
+		geoset = list()
+		for g in geoset1:
+		    if "-" in g:
+			m1 = re.match(r"(\d+)-(\d+)", g)
+			if m is not None:
+			    start = int(m.group(1))
+			    end = int(m.group(2))
+			    for num in range(start,end+1):
+				geoset.append(str(num))
+		    else:
+			geoset.append(str(g))
+		m2 = re.match(r"([\d/]+)", thiskey.strip())
+		if m2 is not None:
+		    self.geo_mapping[m2.group(1)] = geoset
+
     def genText(self, outformat="csv"):
 	if self.verbose:
 	    print "generating %s..." % outformat.upper()
@@ -139,6 +180,8 @@ class GeoCensus():
 	    cols = self.key.split(",")
 	else:
 	    cols = [self.key]
+	if self.verbose:
+	    print "rows of data: %d" % len(self.data)
 	if len(self.data) > 0:
 	    datacols = self.data[self.data.keys()[0]].keys()
 	    datacols.sort()
@@ -219,9 +262,8 @@ class GeoCensus():
 			    has_nulls = True
 			    continue
 			values_str.append(str(v))
-		    if has_nulls:
-			args = { "tablename": tablename, "keys": ",".join(r.keys()), "vals": ",".join(values_str) }
-			out.write("INSERT INTO %(tablename)s (%(keys)s) VALUES (%(vals)s) ;\n" % args)
+		    args = { "tablename": tablename, "keys": ",".join(r.keys()), "vals": ",".join(values_str) }
+	    	    out.write("INSERT INTO %(tablename)s (%(keys)s) VALUES (%(vals)s) ;\n" % args)
     
     def genKml(self):
 	if self.verbose:
@@ -307,17 +349,19 @@ class GeoCensus():
 		    x_geo += "L"
 		elif x_geo + "S" in self.geokml: # small
 		    x_geo += "S"
+		elif x_geo in self.geokml: # found
+		    pass
 		else: # cannot find suffixed geo number
 		    return None
 	    else:
-		return None # x_geo doesn't start with a number
+		return None
 	return x_geo
 
 def main():
     gc = GeoCensus()
     censusdata = None
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "chjksvo:g:t:d:", ["help", "output=", "--geo", "--tolerance", "--data", "csv", "kml", "--key", "--sql", "--json"])
+        opts, args = getopt.getopt(sys.argv[1:], "chjksvo:g:t:d:y:", ["help", "output=", "--geo", "--tolerance", "--data", "csv", "kml", "--key", "--sql", "--json", "--year"])
     except getopt.GetoptError, err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
