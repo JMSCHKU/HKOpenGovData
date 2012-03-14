@@ -46,6 +46,7 @@ class GeoCensus():
 	self.output = None
 	self.verbose = False
 	self.outputformat = "csv"
+	self.year = None
 
     def usage(self):
 	print "geocensus.py [-c(csv)|-d(data)|-h(help)|-k(kml)|-o(output_file)|-v(verbose)]"
@@ -53,6 +54,8 @@ class GeoCensus():
     def setGeo(self, geo):
 	if self.geotable is None:
 	    self.geotable = geo
+	    if self.year is not None:
+		self.geotable += str(self.year)
 	if self.key is None:
 	    if geo in self.GEO_KEYS:
 		self.key = self.GEO_KEYS[geo]
@@ -60,6 +63,11 @@ class GeoCensus():
 	    else:
 		self.key = geo
 		self.geokey = geo
+
+    def setYear(self, year):
+	if self.geotable is not None:
+	    self.geotable += str(year)
+	self.year = int(year)
 
     def setGeoTolerance(self, tolerance):
 	self.geo_tolerance = str(tolerance)
@@ -71,13 +79,16 @@ class GeoCensus():
 		if type(geokey).__name__ == "frozenset":
 		    for x in geokey:
 			self.geokey = x
+			if geokey in self.GEO_AVAIL:
+			    self.setGeo(self.geokey)
 			break
-		if geokey in self.GEO_AVAIL:
+		elif geokey in self.GEO_AVAIL:
 		    self.setGeo(geokey)
 		else:
 		    return 0
 	    else:
 		return 0
+	    self.geotable = self.geokey
 	if self.geo_tolerance is not None:
 	    the_geom = "ST_SimplifyPreserveTopology(the_geom,%(tolerance)s)" % { "tolerance": self.geo_tolerance }
 	else:
@@ -88,7 +99,7 @@ class GeoCensus():
 	    print sql % sql_args
 	resgeo = self.pgconn.query(sql % sql_args).dictresult()
 	for x in resgeo:
-	    self.geokml[x[self.key]] = x
+	    self.geokml[x[self.geokey]] = x
 
     def getCensusData(self, datatable_name, keys=list()):
 	self.datatable = datatable_name
@@ -112,7 +123,14 @@ class GeoCensus():
 	print sql % sql_args
 	resdata = self.pgconn.query(sql % sql_args).dictresult()
 	for x in resdata:
-	    self.data[x[self.key]] = x
+	    if "," in self.key:
+		thiskey_arr = list()
+		for k in self.key.split(","):
+		    thiskey_arr.append(x[k])
+		thiskey = ",".join(thiskey_arr)
+	    else:
+		thiskey = x[self.key]
+	    self.data[thiskey] = x
     
     def genText(self, outformat="csv"):
 	if self.verbose:
@@ -124,7 +142,11 @@ class GeoCensus():
 	if len(self.data) > 0:
 	    datacols = self.data[self.data.keys()[0]].keys()
 	    datacols.sort()
-	    datacols.remove(self.key)
+	    if "," in self.key:
+		for k in self.key.split(","):
+		    datacols.remove(k)
+	    else:
+		datacols.remove(self.key)
 	    cols.extend(datacols)
 	if len(self.geokml):
 	    cols.extend(["point", "boundary"])
@@ -181,15 +203,25 @@ class GeoCensus():
 		elif self.geokml is not None:
 		    tablename = self.geotable
 		for r in txt:
-		    values = r.values()
+		    keys = r.keys()
+		    #values = r.values()
 		    values_str = list()
-		    for v in values:
+		    #for v in values:
+		    has_nulls = False
+		    for k in keys:
+			v = r[k]
 			if type(v) is types.StringType:
 			    v = v.replace("'","''")
 			    v = "'%s'" % v
+			elif type(v) is types.NoneType:
+			    del r[k]
+			    v = ""
+			    has_nulls = True
+			    continue
 			values_str.append(str(v))
-		    args = { "tablename": tablename, "keys": ",".join(r.keys()), "vals": ",".join(values_str) }
-		    out.write("INSERT INTO %(tablename)s (%(keys)s) VALUES (%(vals)s) ;\n" % args)
+		    if has_nulls:
+			args = { "tablename": tablename, "keys": ",".join(r.keys()), "vals": ",".join(values_str) }
+			out.write("INSERT INTO %(tablename)s (%(keys)s) VALUES (%(vals)s) ;\n" % args)
     
     def genKml(self):
 	if self.verbose:
@@ -283,6 +315,7 @@ class GeoCensus():
 
 def main():
     gc = GeoCensus()
+    censusdata = None
     try:
         opts, args = getopt.getopt(sys.argv[1:], "chjksvo:g:t:d:", ["help", "output=", "--geo", "--tolerance", "--data", "csv", "kml", "--key", "--sql", "--json"])
     except getopt.GetoptError, err:
@@ -306,7 +339,8 @@ def main():
 	elif o in ("-t", "--tolerance"):
 	    gc.setGeoTolerance(a)
 	elif o in ("-d", "--data"):
-	    gc.getCensusData(a)
+	    #gc.getCensusData(a)
+	    censusdata = a
 	elif o in ("-c", "--csv"):
 	    gc.outputformat = "csv"
 	elif o in ("-s", "--sql"):
@@ -317,11 +351,15 @@ def main():
 	    gc.outputformat = "kml"
 	elif o in ("-k", "--key"):
 	    gc.key = a
+	elif o in ("-y", "--year"):
+	    gc.setYear(a)
         else:
             assert False, "unhandled option"
     if gc.verbose:
 	print gc.geotable
 	print gc.outputformat
+    if censusdata is not None:
+	gc.getCensusData(censusdata)
     gc.geodb()
     gc.gen()
     # ...
