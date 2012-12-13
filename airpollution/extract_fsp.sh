@@ -35,5 +35,6 @@ do
         LINE="${LINE},${i}"
     fi
 done < $1.out
+echo ${LINE}
 
 rm $1.out
