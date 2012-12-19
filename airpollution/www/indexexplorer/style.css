@@ -1,0 +1,139 @@
+body {
+    font-family: "Open Sans", sans-serif;
+    margin: 5px;
+    padding: 5px;
+    width: 1130px;
+}
+h1 {
+    font-weight: normal;
+    font-family: "ChunkFiveRegular", times, "Times New Roman", serif;
+    margin: 10px 0 0;
+    padding: 0;
+}
+h2 {
+    font-weight: normal;
+    margin: 5px 0 0;
+    padding: 0;
+    font-size: 1.2em;
+}
+#datasource {
+    margin: 5px 0 10px;
+    padding: 0;
+    font-size: 0.8em;
+    font-style: italic;
+}
+#intro {
+    margin: 5px 0 10px;
+    padding: 0;
+    font-size: 0.8em;
+}
+#g-error {
+    background-color: #ffd;
+    border: solid 1px #ccc;
+    font-size: 15px;
+    margin: 10px;
+    padding: 20px;
+    text-align: center;
+}
+div#g-tooltip {
+    position: absolute;
+    display: none;
+    background-color: #fff;
+    border: 1px solid #999;
+    padding: 15px;
+    text-align:center;
+}
+div#g-body {
+    margin: 0 0 10px 0;
+    float: left;
+}
+div#g {
+    width: 960px;
+    margin: 0 0 10px 0;
+    padding: 0 0 10px 0;
+}
+div#footer {
+    width: 960px;
+    clear:both;
+    margin: 20px 0 0 0;
+    padding: 10px 0 0;
+    border-top: 1px solid #DDDDDD;
+    font-size: 0.75em;
+}
+path.line {
+    stroke-width: 1;
+    fill: #FFF;
+    fill-opacity: 0;
+}
+path.line.maxtemp {
+    stroke: #F00;
+}
+path.line.mintemp {
+    stroke: #00F;
+}
+path.line.rainfall {
+    stroke: #0F0;
+}
+path.line.winddir {
+    stroke: #F0F;
+}
+path.line.windspeed {
+    stroke: #FF0;
+}
+line {
+    stroke: #FFF;
+    stroke-opacity: 1.0;
+}
+text.over-text {
+    padding: 5px;
+    color: #000;
+    fill-opacity: 1;
+    font-size: 12px;
+    text-anchor: middle;
+}
+text.over-text.api-value {
+    font-weight: bold;
+}
+text.year-label {
+    font-size: 12px;
+    font-weight: bold;
+}
+rect.bar-under {
+    fill: #999;
+    fill-opacity: 0;
+    stroke-opacity: 0;
+}
+rect.bar-under.pointer { fill: #000; }
+rect.bar-under.low { fill: #090; }
+rect.bar-under.medium { fill: #0FF; }
+rect.bar-under.high { fill: #FF0; }
+rect.bar-under.veryhigh { fill: #F00; }
+rect.bar-under.severe { fill: #000; }
+a.button {
+    display: inline-block;
+    padding: 5px 10px;
+    border: 1px solid #666;
+    border-radius: 5px;
+    text-decoration: none;
+    color: #333; 
+}
+a:hover.button,
+a:hover.button.selected {
+    color: #FFF; 
+    background-color: #666;
+}
+a.button.selected {
+    color: #FFF; 
+    background-color: #000;
+}
+#controls {
+    font-size: 0.9em;    
+}
+#station-desc {
+    font-size: 0.9em;
+    font-style: italic;
+}
+#logo-jmsc {
+    float: right;
+}
+

@@ -1,0 +1,15 @@
+id,station,characteristics,districts,station_zht,characteristics_zht,districts_zht
+1,Central/Western,Urban: densely populated residential area with commercial developments,"Central and Western, Wan Chai, Southern (depending on the location)",中西區,市區：人口稠密兼有商業發展的住宅區,"中西區,灣仔,南區（視乎所在位置）"
+2,Sham Shui Po,Urban: densely populated residential area with commercial developments,"Sham Shui Po, Yau Tsim Mong, Kowloon City",深水,市區：人口稠密兼有商業發展的住宅區,"深水,油尖旺,九龍城"
+3,Eastern,Urban: densely populated residential area,"Eastern, Southern (depending on the location)",東區,市區：人口稠密的住宅區,"東區,南區（視乎所在位置）"
+4,Kwun Tong,Urban: densely populated residential area with mixed commercial/industrial developments,"Kwun Tong, Wong Tai Sin",觀塘,市區：人口稠密兼有工商業發展的住宅區,"觀塘,黃大仙"
+5,Kwai Chung,Urban: densely populated residential area with mixed commercial/industrial developments,Kwai Tsing,葵涌,市區：人口稠密兼有工商業發展的住宅區,葵青
+6,Tsuen Wan,Urban: densely populated residential area with mixed commercial/industrial developments,Tsuen Wan,荃灣,市區：人口稠密兼有工商業發展的住宅區,荃灣
+7,Tai Po,New town: residential area,"Tai Po, North (including Sheung Shui and Fanling)",大埔,新市鎮：住宅區,"大埔,北區（包括上水及粉嶺）"
+8,Sha Tin,New town: residential area,"Shatin, Sai Kung (including Tseung Kwan O)",沙田,新市鎮：住宅區,"沙田,西貢（包括將軍澳）"
+9,Tung Chung,New town: residential area,Islands,東涌,新市鎮：住宅區,離島
+10,Yuen Long,New town: residential area,"Yuen Long (including Tin Shui Wai), Tuen Mun",元朗,新市鎮：住宅區,"元朗（包括天水圍）,屯門"
+11,Tap Mun,Rural,,塔門,郊區,
+12,Causeway Bay,Roadside Station,,銅鑼灣,路邊監測站,
+13,Central,Roadside Station,,中環,路邊監測站,
+14,Mong Kok,Roadside Station,,旺角,路邊監測站,
