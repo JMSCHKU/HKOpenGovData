@@ -2,7 +2,7 @@
 
 DDAY=`date +%Y%m%d`
 D=`date +%Y%m%d-%H`
-DHOUR="`date +%Y-%m-%d\ %H:`:00"
+DHOUR="`date +%Y-%m-%d\ %H`:00"
 
 curl -s "http://www.epd-asg.gov.hk/eindex.html" -o current_api/currentapi_${D}.html
 

@@ -1,4 +1,5 @@
 #!/bin/bash
+export PATH=${PATH}:${HOME}/bin
 
 if [ $# -lt 1 ]
 then
@@ -27,7 +28,7 @@ then
     then
         echo "NOT FOUND: ${DATEHOUR}"
         echo "trying insert again..."
-        #./fsp_to_ft.sh ${DATEHOUR} -e
+        ./fsp_to_ft.sh ${DATEHOUR} -e
     fi
 else
     grep ${DATE} verify_fsp_${DATESHORT}.json | sed 's/^ *//g' | sed 's/[",]*//g' | sed "s/${DATE} //g" | sed 's/:00:00//g' > verify_fsp_dates_${DATESHORT}.txt
@@ -38,7 +39,7 @@ else
         then
             echo "NOT FOUND: ${DATE} (${i})"
             echo "trying insert again..."
-            #./fsp_to_ft.sh ${DATE} ${i}:00:00 -e
+            ./fsp_to_ft.sh ${DATE} ${i}:00:00 -e
         fi
     done
 fi

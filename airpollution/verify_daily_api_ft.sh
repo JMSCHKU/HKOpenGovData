@@ -1,4 +1,5 @@
 #!/bin/bash
+export PATH=${PATH}:${HOME}/bin
 
 if [ $# -lt 1 ]
 then
