@@ -1,35 +1,50 @@
 #!/bin/bash
 
+cd pdfs
+
 if [ $# -lt 1 ]
 then
     echo "Missing file"
     exit
 fi
 
+secondpass=0
+if [ $# -gt 1 ]
+then
+    case $2 in
+    2)
+        secondpass=1 ;;
+    esac
+fi
+
 while read i
 do
-    COOKIE=`curl -s -I "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "PHPSESSID=(\w+)" `
-    vol=`echo $i | grep -oE "&vol=([0-9]+)" | grep -oE "[0-9]+" `
-    no=`echo $i | grep -oE "&no=([0-9]+)" | grep -oE "[0-9]+" `
-    extra=`echo $i | grep -oE "extra=([0-9]+)" | grep -oE "[0-9]+" `
-    Y=`echo $i | grep -oE "&year=([0-9]{4})" | grep -oE "[0-9]{4}" `
-    m=`echo $i | grep -oE "&month=([0-9]{2})" | grep -oE "[0-9]{2}" `
-    d=`echo $i | grep -oE "&day=([0-9]{2})" | grep -oE "[0-9]{2}" `
-    gn=`echo $i | grep -oE "&gn=([0-9]{1,})" | grep -oE "[0-9]{1,}" `
-    typ=`echo $i | grep -oE "&type=([0-9]{1,})" | grep -oE "[0-9]{1,}" `
-    id=`echo $i | grep -oE "&id=([0-9]{1,})" | grep -oE "[0-9]{1,}" `
-    FO="${Y}-${m}-${d}_${vol}-${no}_${extra}_${typ}_${id}"
-    URL=`echo "http://www.gld.gov.hk/egazette/english/gazette/${i}"`
-    #echo $COOKIE
-    #echo $URL
+    if [ ${secondpass} -eq 1 ]
+    then
+        ref=`echo ${i} | cut -d\| -f2`
+        i=`echo ${i} | cut -d\| -f1`
+    fi
+    COOKIE=`curl -sI "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "PHPSESSID=(\w+)" `
+    PAGE=`echo "${i}" -d\| -f1`
+    URL=`echo "http://www.gld.gov.hk/egazette/english/gazette/${PAGE}"`
     LOC=`curl -s -I -b "${COOKIE}" "${URL}" | grep -Eo "Location: (.*)" | cut -d: -f2 | sed 's/[ ]\{1,\}..\/..\/..\/egazette\///g' | sed 's/[ \t\r\n]\+$//g'`
     URLPDF=`echo "http://www.gld.gov.hk/egazette/$LOC"`
-    wget "${URLPDF}"
-    echo ${URL} ${URLPDF}
-    if [ `ls ${URLPDF} 2> /dev/null | wc -l` -ge 1 ]
+    FO=`echo $LOC | sed 's/^pdf\///' | sed 's/\//_/g'`
+    if [ ! -f ${FO} ]
     then
-        echo ${URLPDF}
-    else
-        rm ${URLPDF} 2> /dev/null
+        curl -s -b "${COOKIE}" "${URLPDF}" -o ${FO}
     fi
-done < $1
+    if [ `ls ${FO} 2> /dev/null | wc -l` -ge 1 ]
+    then
+        i=`echo ${i} | sed 's/[\r\n]\+//g'`
+        if [ ${secondpass} -eq 1 ]
+        then
+            i="$ref|$i"
+        fi
+        echo ${i},${FO},`md5sum ${FO} | cut -d" " -f1`
+    else
+        echo "${i},,"
+    fi
+done < ../$1
+
+cd ..

@@ -10,12 +10,15 @@ import xml.etree.ElementTree as ET
 
 if len(sys.argv) <= 1:
     sys.exit()
+ref_in = ""
+if len(sys.argv) > 2:
+    ref_in = "|" + sys.argv[2]
 
 tree = ET.parse(sys.argv[1])
 root = tree.getroot()
 
-fields = ["date", "vol", "no", "extra", "type", "section", "rev", "notice_no", "subject", "dept", "deptemail", "officer", "link"]
-textfields = ["section", "subject", "dept", "officer"]
+fields = ["date", "vol", "no", "extra", "typeid", "typedesc", "section", "rev", "notice_no", "subject", "dept", "deptemail", "officer", "group", "classification", "link"]
+textfields = ["section", "subject", "dept", "officer", "group", "classification"]
 
 pdfs = list()
 
@@ -36,6 +39,10 @@ if extra_re is not None:
     extra = 1
 else:
     extra = 0
+typedesc_re = re.search(r"- (.*)$", head)
+if typedesc_re is not None:
+    typedesc = typedesc_re.group(1)
+section = None
 
 # Parse revision date
 if len(root) > 2:
@@ -47,14 +54,21 @@ else:
     rev = None
 
 table = root[1]
-if table.tag == "tbody":
+if table[0].tag == "tbody":
     table = table[0]
 isheader = True
+isls6 = False
+cols = list()
 for tr in table:
     if isheader:
         isheader = False
+        if tr[0].tag == "th":
+            for x in tr:
+                cols.append(x.text.lower())
+        if len(cols) >= 2 and cols[0] == "group" and cols[1] == "classification":
+            isls6 = True
         continue
-    if len(tr) <= 1: # sub-header
+    if len(tr) <= 1 and tr[0].get("class") == "category": # sub-header
         section = tr[0].text
         continue
     row = dict()
@@ -65,14 +79,24 @@ for tr in table:
     row["section"] = section
     row["rev"] = rev
     #row["desc"] = tr[0].text
-    try:
-        row["notice_no"] = int(tr[0][0].text)
-    except:
-        if tr[0][0].text == "--":
-            row["notice_no"] = None
-        else:
-            row["notice_no"] = tr[0][0].text
-    row["subject"] = tr[1][0].text
+    row["subject"] = row["notice_no"] = row["group"] = row["classification"] = None
+    if len(tr) > 1 and not isls6:
+        try:
+            row["notice_no"] = int(tr[0][0].text)
+        except:
+            if tr[0][0].text == "--":
+                row["notice_no"] = None
+            else:
+                row["notice_no"] = tr[0][0].text
+        row["subject"] = tr[1][0].text
+    elif isls6:
+        row["group"] = tr[0][0].text
+        if tr[0][0].tail is not None:
+            row["group"] += "\r" + tr[0][0].tail
+        row["classification"] = tr[1].text
+    elif len(tr) == 1:
+        row["notice_no"] = None
+        row["subject"] = tr[0][0].text
     if len(tr) > 2:
         if len(tr[2]) > 0:
             row["dept"] = tr[2][0].text
@@ -90,10 +114,15 @@ for tr in table:
             row["officer"] = tr[3].text
     else:
         row["officer"] = None
-    row["link"] = tr[0][0].get("href")
+    row["link"] = tr[0][0].get("href") + ref_in
+    typeid_re = re.search(r"&type=(\d+)", row["link"])
+    if typeid_re is not None:
+        row["typeid"] = int(typeid_re.group(1))
+    else:
+        row["typeid"] = 0
     for a in textfields:
         if row[a] is not None:
-            row[a] = row[a].encode("utf8").strip()
+            row[a] = re.sub(r"[ \t]+\n", "\n", re.sub(r"\n[ \t]+", "\n", row[a].encode("utf8").strip()))
     pdfs.append(row)
 
 cw = csv.DictWriter(sys.stdout, fields)
