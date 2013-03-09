@@ -14,7 +14,12 @@ ref_in = ""
 if len(sys.argv) > 2:
     ref_in = "|" + sys.argv[2]
 
-tree = ET.parse(sys.argv[1])
+try:
+    tree = ET.parse(sys.argv[1])
+except Exception as e:
+    sys.stderr.write("Found error and exiting while processing PDF list: " + sys.argv[1] + "\n")
+    sys.stderr.write(str(e) + "\n")
+    sys.exit()
 root = tree.getroot()
 
 fields = ["date", "vol", "no", "extra", "typeid", "typedesc", "section", "rev", "notice_no", "subject", "dept", "deptemail", "officer", "group", "classification", "link"]

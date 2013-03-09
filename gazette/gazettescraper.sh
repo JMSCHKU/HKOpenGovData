@@ -124,7 +124,7 @@ do
     head -${HEAD} ${IN}.tail >> ${IN}.out
     dos2unix -q ${IN}.out
     sed -i 's/&nbsp;/ /g' ${IN}.out
-    sed -i 's/<br>/ \n/g' ${IN}.out
+    sed -i 'si/<br>/ \n/g' ${IN}.out
     sed -i 's/&/\&amp;/g' ${IN}.out
     sed -i 's/<img [^>]\+>//g' ${IN}.out
     if [ `echo ${IN}.out | grep "^ls6-" | wc -l` -ge 1 ]
@@ -133,7 +133,7 @@ do
     fi
     echo "</root>" >> ${IN}.out
     # Send through the parser
-    ./parse_pdflist.py ${IN}.out >> ${PDFLISTS_URLS}
+    ./parse_pdflist.py ${IN}.out 2>> error.${D}.log >> ${PDFLISTS_URLS}
     rm ${IN} ${IN}.tail ${IN}.out
     #rm ${IN} ${IN}.tail
 done < ${PDFLISTS}
@@ -197,7 +197,7 @@ then
         fi
         echo "</root>" >> ${IN}.out
         # Send through the parser
-        ./parse_pdflist.py ${IN}.out "${REF_IN}" >> ${PDFLISTS_URLS}.1
+        ./parse_pdflist.py ${IN}.out "${REF_IN}" 2>> error.${D}.log >> ${PDFLISTS_URLS}.1
         rm ${IN} ${IN}.tail ${IN}.out
         #rm ${IN} ${IN}.tail
     done < ${PDFLISTS}.1
@@ -205,11 +205,27 @@ then
     sed -i 's/&amp;/\&/g' ${PDFLISTS_URLS}.1
     grep -oE ",pdf.php\?[^,]*$" ${PDFLISTS_URLS}.1 | cut -d, -f2 > ${PDFS}.1
     grep -vE ",,$" ${PDFS_OUT} > foo.${D}.csv
-    cp ${PDFS_OUT} ${PDFS_OUT}.1
+    mv ${PDFS}.1 ${PDFS_OUT} pdfs.files.secondpass/${PDFS_OUT}.1
     mv foo.${D}.csv ${PDFS_OUT}
     ./getpdfs.sh ${PDFS}.1 2 >> ${PDFS_OUT}
-    rm ${PDFLISTS}.1 ${PDFS_OUT}.1
+    rm ${PDFLISTS}.1 ${PDFLISTS_URLS}.1 # ${PDFS}.1 # ${PDFS_OUT}.1
 fi
+
+# Put the headers
+## gazette.docs
+mv ${PDFLISTS_URLS} ${PDFLISTS_URLS}.out
+echo "gazdate,vol,no,extra,typeid,typedesc,section,rev,notice_no,subject,dept,deptemail,officer,group,classification,link" > ${PDFLISTS_URLS}
+cat ${PDFLISTS_URLS}.out >> ${PDFLISTS_URLS}
+rm ${PDFLISTS_URLS}.out
+./insert_by_row.py gazette.docs ${PDFLISTS_URLS}
+mv ${PDFLISTS_URLS} pdflists
+## gazette.pdfs
+mv ${PDFS_OUT} ${PDFS_OUT}.out
+echo "link,filename,filehash" > ${PDFS_OUT}
+cat ${PDFS_OUT}.out >> ${PDFS_OUT}
+rm ${PDFS_OUT}.out
+./insert_by_row.py gazette.pdfs ${PDFS_OUT}
+mv ${PDFS_OUT} pdfs.files.csvs
 
 rm ${VOLS} ${VOLS_URLS} ${GAZETTES} ${PDFLISTS} ${GAZETTES_URLS} ${PDFS} ${VOLS_PDFS} #${PDFLISTS_URLS}
 
