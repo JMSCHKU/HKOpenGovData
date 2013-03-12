@@ -22,7 +22,7 @@ mstart = mend = None
 for line in f:
     line = line.strip(" \r\n")
     if not inline:
-        mstart = re.search(r"^[0-9]{,:} ", line)
+        mstart = re.search(r"^[0-9]{,3} ", line)
     if mstart is not None:
         if mstart.group() == line:
             continue

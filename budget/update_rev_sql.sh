@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for i in `seq 2013 2013`
+for i in `seq 2006 2014`
 do
     echo $i
     while read line
@@ -14,8 +14,7 @@ do
         if [ ${approved} == "" ]; then approved="null"; fi
         if [ ${revised} == "" ]; then revised="null"; fi
         if [ ${estimate} == "" ]; then estimate="null"; fi
-        updatesql="UPDATE budget.expenditures SET actual${i} = ${actual}, approved${i} = ${approved}, revised${i} = ${revised}, estimate${i} = ${estimate} WHERE head = ${head} "
-        echo "${updatesql}"
+        updatesql="UPDATE budget.revenues SET actual${i} = ${actual}, approved${i} = ${approved}, revised${i} = ${revised}, estimate${i} = ${estimate} WHERE head = ${head} "
         psql -h 127.0.0.1 -U opengov -c "${updatesql}"
-    done < sum_exp_e_${i}.csv
+    done < sumrev_p_e_${i}.csv
 done
