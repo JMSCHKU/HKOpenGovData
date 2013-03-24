@@ -124,7 +124,7 @@ do
     head -${HEAD} ${IN}.tail >> ${IN}.out
     dos2unix -q ${IN}.out
     sed -i 's/&nbsp;/ /g' ${IN}.out
-    sed -i 'si/<br>/ \n/g' ${IN}.out
+    sed -i 's/<br>/ \n/gi' ${IN}.out
     sed -i 's/&/\&amp;/g' ${IN}.out
     sed -i 's/<img [^>]\+>//g' ${IN}.out
     if [ `echo ${IN}.out | grep "^ls6-" | wc -l` -ge 1 ]
@@ -134,8 +134,14 @@ do
     echo "</root>" >> ${IN}.out
     # Send through the parser
     ./parse_pdflist.py ${IN}.out 2>> error.${D}.log >> ${PDFLISTS_URLS}
-    rm ${IN} ${IN}.tail ${IN}.out
-    #rm ${IN} ${IN}.tail
+    #rm ${IN} ${IN}.tail ${IN}.out
+    rm ${IN} ${IN}.tail
+    if [ `grep "${IN}.out" error.${D}.log | wc -l` -eq 0 ]
+    then
+        rm ${IN}.out
+    else
+        mv ${IN}.out errors
+    fi
 done < ${PDFLISTS}
 
 # Get the PDFs (first pass)
@@ -150,7 +156,7 @@ PDFS_OUT="pdfs.files.${D}.csv"
 dos2unix -q ${PDFLISTS_URLS}
 sed -i 's/&amp;/\&/g' ${PDFLISTS_URLS}
 grep -oE ",pdf\.php\?[^,]*$" ${PDFLISTS_URLS} | cut -d, -f2 > ${PDFS}
-./getpdfs.sh ${PDFS} >> ${PDFS_OUT}
+./getpdfs.sh ${PDFS} 2> /dev/null >> ${PDFS_OUT}
 
 # Other sub-pages
 VOLS_PDFS="vols.pdfs.${D}.csv"
@@ -188,7 +194,7 @@ then
         head -${HEAD} ${IN}.tail >> ${IN}.out
         dos2unix -q ${IN}.out
         sed -i 's/&nbsp;/ /g' ${IN}.out
-        sed -i 's/<br>/ \n/g' ${IN}.out
+        sed -i 's/<br>/ \n/gi' ${IN}.out
         sed -i 's/&/\&amp;/g' ${IN}.out
         sed -i 's/<img [^>]\+>//g' ${IN}.out
         if [ `echo ${IN}.out | grep "^ls6-" | wc -l` -ge 1 ]
@@ -205,9 +211,9 @@ then
     sed -i 's/&amp;/\&/g' ${PDFLISTS_URLS}.1
     grep -oE ",pdf.php\?[^,]*$" ${PDFLISTS_URLS}.1 | cut -d, -f2 > ${PDFS}.1
     grep -vE ",,$" ${PDFS_OUT} > foo.${D}.csv
-    mv ${PDFS}.1 ${PDFS_OUT} pdfs.files.secondpass/${PDFS_OUT}.1
+    mv ${PDFS}.1 ${PDFS_OUT} pdfs.files.secondpass/
     mv foo.${D}.csv ${PDFS_OUT}
-    ./getpdfs.sh ${PDFS}.1 2 >> ${PDFS_OUT}
+    ./getpdfs.sh ${PDFS}.1 2 2> /dev/null >> ${PDFS_OUT}
     rm ${PDFLISTS}.1 ${PDFLISTS_URLS}.1 # ${PDFS}.1 # ${PDFS_OUT}.1
 fi
 
@@ -226,6 +232,8 @@ cat ${PDFS_OUT}.out >> ${PDFS_OUT}
 rm ${PDFS_OUT}.out
 ./insert_by_row.py gazette.pdfs ${PDFS_OUT}
 mv ${PDFS_OUT} pdfs.files.csvs
+
+mv error.${D}.log errors
 
 rm ${VOLS} ${VOLS_URLS} ${GAZETTES} ${PDFLISTS} ${GAZETTES_URLS} ${PDFS} ${VOLS_PDFS} #${PDFLISTS_URLS}
 

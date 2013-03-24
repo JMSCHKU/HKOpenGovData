@@ -29,11 +29,13 @@ for r in cr:
     except pg.ProgrammingError as e:
         if not doupdate:
             continue
+        if "duplicate" not in str(e):
+            print str(e)
         r["dbupdated"] = 'now()'
         try:
             pgconn.update(sys.argv[1], r)
         except Exception as e:
-            print e.message()
+            print str(e)
             continue
 
 #pgconn.insert(sys.argv[1])
