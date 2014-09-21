@@ -15,6 +15,10 @@ then
     esac
 fi
 
+let MAX_TRIES=20
+tries=0
+SLEEPSECS=5
+
 while read line
 do
     if [ ${secondpass} -eq 1 ]
@@ -70,8 +74,25 @@ do
         FO="${Y}-${m}-${d}_${vol}-${no}_${extra}_${typ}.html"
         URL=`echo "${URL}volume.php${i}"`
     fi
-    curl -s -b "${COOKIE}" "${URL}" -o "${FO}"
-    if [ `ls ${FO} 2> /dev/null | wc -l` -ge 1 ]
+    while true
+    do
+        curl -s -b "${COOKIE}" "${URL}" -o "${FO}"
+        let tries=${tries}+1
+        if [ -s "${FO}" ]
+        then
+            break
+        else
+            #echo "LOG: file empty: ${FO} (try #${tries})"
+            if [ ${tries} -gt ${MAX_TRIES} ]
+            then
+                #echo "LOG: Tried maximum times (${MAX_TRIES}) on ${FO}. Go to next file..."
+                break
+            fi
+            sleep 2
+        fi
+    done
+    tries=0
+    if [ -s ${FO} ]
     then
         if [ ${secondpass} -eq 1 ]
         then

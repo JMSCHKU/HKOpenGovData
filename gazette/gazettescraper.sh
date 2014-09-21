@@ -9,6 +9,10 @@ then
     toc_max=$1
 fi
 
+let MAX_TRIES=${toc_max}*10
+let MAX_TRIES=${MAX_TRIES}+10
+tries=0
+SLEEPSECS=5
 
 BASEURL="http://www.gld.gov.hk/egazette/english/gazette/"
 TOC="http://www.gld.gov.hk/egazette/english/gazette/toc.php"
@@ -26,6 +30,19 @@ do
     # Get the TOC page
     IN="toc.${D}.${toc_i}.html"
     curl -sb "${COOKIE}" "${TOC}?page=${toc_i}" -o ${IN}
+    echo FILE: ${IN}
+    if [ ! -s ${IN} ]
+    then
+        let tries=${tries}+1
+        if [ ${tries} -gt ${MAX_TRIES} ]
+        then
+            echo "Tried maximum times (${MAX_TRIES}). Now exiting process..."
+            exit
+        fi
+        echo "file empty: ${IN} (try #${tries})"
+        sleep ${SLEEPSECS}
+        continue
+    fi
     # Retain the part we want
     echo ${IN}
     LEN=`wc -l ${IN} | cut -d" " -f1`
@@ -50,7 +67,7 @@ do
     fi
 done
 
-sleep 1
+sleep ${SLEEPSECS}
 
 VOLS_URLS="vols.urls.${D}.csv"
 GAZETTES="gazettes.${D}.csv"
@@ -68,8 +85,14 @@ echo "Processing volume pages..."
 while read IN
 do
     echo ${IN}
-    if [ ! -r ${IN} ]
+    if [ ! -s ${IN} ]
     then
+        let tries=${tries}+1
+        if [ ${tries} -gt ${MAX_TRIES} ]
+        then
+            echo "Tried maximum times (${MAX_TRIES}). Now exiting process..."
+            exit
+        fi
         continue
     fi
     LEN=`wc -l ${IN} | cut -d" " -f1`
@@ -91,7 +114,8 @@ done < ${GAZETTES}
 
 PDFLISTS="pdflists.${D}.csv"
 PDFLISTS_URLS="pdflists.urls.${D}.csv"
-if [ ! -r ${GAZETTES_URLS} ] || [ `wc -l ${GAZETTES_URLS} | cut -d" " -f1` -le 0 ]
+#if [ ! -r ${GAZETTES_URLS} ] || [ `wc -l ${GAZETTES_URLS} | cut -d" " -f1` -le 0 ]
+if [ ! -s ${GAZETTES_URLS} ]
 then
     echo "Gazette file ${GAZETTES_URLS} not found. Exiting..."
     rm ${VOLS} ${VOLS_URLS} ${GAZETTES}
@@ -103,7 +127,7 @@ echo "Processing PDF listing pages..."
 while read IN
 do
     echo ${IN}
-    if [ ! -r ${IN} ]
+    if [ ! -s ${IN} ]
     then
         continue
     fi
@@ -163,7 +187,8 @@ VOLS_PDFS="vols.pdfs.${D}.csv"
 grep -oE ",volume\.php\?[^,]*$" ${PDFLISTS_URLS} | cut -d, -f2 > ${VOLS_PDFS}
 grep -E ",,$" ${PDFS_OUT} | cut -d, -f1 >> ${VOLS_PDFS}
 ./getlinks.sh ${VOLS_PDFS} 2 >> ${PDFLISTS}.1
-if [ `wc -l ${PDFLISTS}.1 | cut -d" " -f1` -ge 1 ]
+#if [ `wc -l ${PDFLISTS}.1 | cut -d" " -f1` -ge 1 ]
+if [ -s ${PDFLISTS}.1 ]
 then
     echo "Second pass PDF listing pages..."
     while read IN
@@ -173,12 +198,16 @@ then
         #echo "${REF_IN}" >> secondpass.${D}.log
         #echo "${IN}" >> secondpass.${D}.log
         echo ${REF_IN} ${IN}
-        if [ ! -r ${IN} ]
+        if [ ! -s ${IN} ]
         then
             continue
         fi
         LEN=`wc -l ${IN} | cut -d" " -f1`
         TOP=`grep -n '<p class="h2">' ${IN} | cut -d: -f1`
+        if [ "${TOP}" == "" ]
+        then
+            continue
+        fi
         let TAIL=${LEN}-${TOP}
         let TAIL=${TAIL}+1
         tail -${TAIL} ${IN} > ${IN}.tail
@@ -214,7 +243,7 @@ then
     mv ${PDFS}.1 ${PDFS_OUT} pdfs.files.secondpass/
     mv foo.${D}.csv ${PDFS_OUT}
     ./getpdfs.sh ${PDFS}.1 2 2> /dev/null >> ${PDFS_OUT}
-    rm ${PDFLISTS}.1 ${PDFLISTS_URLS}.1 # ${PDFS}.1 # ${PDFS_OUT}.1
+    rm ${PDFLISTS}.1 ${PDFLISTS_URLS}.1 ${PDFS}.1 # ${PDFS_OUT}.1
 fi
 
 # Put the headers
