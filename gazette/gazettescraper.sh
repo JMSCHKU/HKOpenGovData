@@ -240,11 +240,14 @@ then
     sed -i 's/&amp;/\&/g' ${PDFLISTS_URLS}.1
     grep -oE ",pdf.php\?[^,]*$" ${PDFLISTS_URLS}.1 | cut -d, -f2 > ${PDFS}.1
     grep -vE ",,$" ${PDFS_OUT} > foo.${D}.csv
-    mv ${PDFS_OUT} pdfs.files.secondpass/
+    #mv ${PDFS_OUT} pdfs.files.secondpass/
+    rm ${PDFS_OUT}
     mv foo.${D}.csv ${PDFS_OUT}
     ./getpdfs.sh ${PDFS}.1 2 2> /dev/null >> ${PDFS_OUT}
     rm ${PDFLISTS}.1 ${PDFLISTS_URLS}.1 ${PDFS}.1 # ${PDFS_OUT}.1
 fi
+
+find -name \*.txt -exec mv {} text \;
 
 # Put the headers
 ## gazette.docs
