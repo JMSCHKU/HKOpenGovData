@@ -244,10 +244,10 @@ then
     rm ${PDFS_OUT}
     mv foo.${D}.csv ${PDFS_OUT}
     ./getpdfs.sh ${PDFS}.1 2 2> /dev/null >> ${PDFS_OUT}
-    rm ${PDFLISTS}.1 ${PDFLISTS_URLS}.1 ${PDFS}.1 # ${PDFS_OUT}.1
+    rm ${PDFLISTS}.1 ${PDFLISTS_URLS}.1 ${PDFS}.1 ${PDFS_OUT}.1
 fi
 
-find -name \*.txt -exec mv {} text \;
+find pdfs -name \*.txt -exec mv {} text \;
 
 # Put the headers
 ## gazette.docs
@@ -267,6 +267,6 @@ mv ${PDFS_OUT} pdfs.files.csvs
 
 mv error.${D}.log errors
 
-rm ${VOLS} ${VOLS_URLS} ${GAZETTES} ${PDFLISTS} ${GAZETTES_URLS} ${PDFS} ${VOLS_PDFS} #${PDFLISTS_URLS}
+rm ${VOLS} ${VOLS_URLS} ${GAZETTES} ${PDFLISTS} ${GAZETTES_URLS} ${PDFS} ${VOLS_PDFS} ${PDFLISTS_URLS}
 
 echo SUCCESS

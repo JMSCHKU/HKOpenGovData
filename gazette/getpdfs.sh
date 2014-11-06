@@ -1,6 +1,8 @@
 #!/bin/bash
 
 cd pdfs
+FI="../$1"
+SP="../`echo $1 | sed 's/\([^\/]\+\)$/to2ndpass.\1/'`"
 
 if [ $# -lt 1 ]
 then
@@ -8,9 +10,71 @@ then
     exit
 fi
 
+if [ ! -s ${FI} ]
+then
+    exit
+fi
+
 let MAX_TRIES=20
 tries=0
 SLEEPSECS=5
+BASEURL="http://www.gld.gov.hk/egazette/english/gazette"
+DISCLAIMER="${BASEURL}/disclaimer.php"
+TOC="${BASEURL}/toc.php"
+COOKIE=""
+COUNTER=0
+TRIES=60
+PHPSESSID=""
+TSCOOKIE=""
+SICOOKIE=""
+
+function renew_cookies {
+    # Get PHP SESSION ID
+    while [ `echo $PHPSESSID | wc -c` -lt 37 ] && [ $COUNTER -lt ${TRIES} ]
+    do
+        HDRS=`curl -sI "${TOC}"`
+        PHPSESSID=`echo "${HDRS}" | grep -Eo "PHPSESSID=(\w+)"`
+        TSCOOKIE=`echo "${HDRS}" | grep -Eo "Set-Cookie: (TS[^;]+)" | cut -d: -f2-`
+        SICOOKIE=`echo "${HDRS}" | grep -Eo "Set-Cookie: (SI[^;]+)" | cut -d: -f2-`
+        sleep .5
+        let COUNTER=$COUNTER+1
+    done
+
+    if [ `echo $PHPSESSID | wc -c` -lt 37 ]
+    then
+        exit
+    fi
+    COUNTER=0
+    URLTOUSE="${DISCLAIMER}"
+    while [ `echo $SICOOKIE | wc -c` -lt 10 ] && [ $COUNTER -lt ${TRIES} ]
+    do
+        HDRS=`curl -sIb "${PHPSESSID};" "${URLTOUSE}"`
+        if [ `echo $TSCOOKIE | wc -c` -lt 10 ]
+        then
+            TSCOOKIE=`echo "${HDRS}" | grep -Eo "Set-Cookie: (TS[^;]+)" | cut -d: -f2-`
+        fi
+        if [ `echo $SICOOKIE | wc -c` -lt 10 ]
+        then
+            SICOOKIE=`echo "${HDRS}" | grep -Eo "Set-Cookie: (SI[^;]+)" | cut -d: -f2-`
+        else
+            URLTOUSE="${TOC}?Submit=accept"
+        fi
+        sleep .5
+        let COUNTER=$COUNTER+1
+    done
+    URLTOUSE="${TOC}?Submit=accept"
+
+    if [ `echo $SICOOKIE | wc -c` -lt 10 ]
+    then
+        exit
+    fi
+
+    COOKIE="${PHPSESSID};${SICOOKIE};${TSCOOKIE}"
+    COOKIE=`echo ${COOKIE} | sed 's/; *$//'`
+    curl -sIb "${COOKIE}" "${URLTOUSE}" > /dev/null
+    >&2 echo "$COOKIE"
+}
+renew_cookies
 
 secondpass=0
 if [ $# -gt 1 ]
@@ -23,18 +87,30 @@ fi
 
 while read i
 do
-    echo $i
     if [ ${secondpass} -eq 1 ]
     then
         ref=`echo ${i} | cut -d\| -f2`
         i=`echo ${i} | cut -d\| -f1`
     fi
-    #COOKIE=`curl -sI "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "PHPSESSID=(\w+)" `
-    COOKIE=`curl -sI "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "Set-Cookie: [^;]+" | cut -d" " -f2 | sed 's/$/;/' | sed ':a;N;$!ba;s/\n/ /g'`
     PAGE=`echo "${i}" | cut -d\| -f1`
-    URL=`echo "http://www.gld.gov.hk/egazette/english/gazette/${PAGE}"`
-    LOC=`curl -s -I -b "${COOKIE}" "${URL}" | grep -Eo "Location: (.*)" | cut -d: -f2 | sed 's/[ ]\{1,\}..\/..\/..\/egazette\///g' | sed 's/[ \t\r\n]\+$//g'`
+    URL=`echo "${BASEURL}/${PAGE}"`
+    HDRS=`curl -s -I -b "${COOKIE}" "${URL}"`
+    LOC=`echo "${HDRS}" | grep -Eoi "Location: (.*)" | cut -d: -f2 | sed 's/[ ]\{1,\}..\/..\/..\/egazette\///g' | sed 's/[ \t\r\n]\+$//g'`
+    if [ `echo ${LOC} | wc -c` -lt 10 ] && [ `echo "${HDRS}" | grep refresh | grep disclaimer.php | wc -l` -gt 0 ] # When it sends you to the disclaimer
+    then
+        renew_cookies
+        LOC=`curl -s -I -b "${COOKIE}" "${URL}" | grep -Eoi "Location: (.*)" | cut -d: -f2 | sed 's/[ ]\{1,\}..\/..\/..\/egazette\///g' | sed 's/[ \t\r\n]\+$//g'`
+        if [ `echo ${LOC} | wc -c` -lt 10 ]
+        then
+            exit
+        fi
+    elif [ `echo ${LOC} | wc -c` -lt 10 ] # Missing location, but does not send you to disclaimer (must be another page)
+    then
+        curl -sb "${COOKIE}" "${URL}" | sed 's/\&amp;/\&/g' | grep -oE "`echo ${PAGE} | sed 's/pdf.php//' | sed 's/?/\\?/g'`[^\"]+" | sed "s/$/|`echo "${PAGE}" | sed 's/\&/\\\&/g'`/" | sed 's/^/pdf.php?/g' | sort -u >> $SP
+        continue
+    fi
     URLPDF=`echo "http://www.gld.gov.hk/egazette/$LOC"`
+    >&2 echo ${URL} ${URLPDF}
     FO=`echo $LOC | sed 's/^pdf\///' | sed 's/\//_/g'`
     if [ ! -s ${FO} ]
     then
@@ -56,7 +132,7 @@ do
             fi
         done
         tries=0
-        pdftotext -layout ${FO} > ../text/`echo ${FO} | sed 's/\.pdf/.txt/g'`
+        pdftotext -layout ${FO} "../text/`echo ${FO} | sed 's/\.pdf/.txt/g'`"
     fi
     if [ -s ${FO} ]
     then
@@ -69,6 +145,7 @@ do
     else
         echo "${i},,"
     fi
-done < ../$1
+done < $FI
 
 cd ..
+
