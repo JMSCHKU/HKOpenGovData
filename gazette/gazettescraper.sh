@@ -24,6 +24,7 @@ echo "Processing table of contents..."
 
 VOLS="vols.${D}.csv"
 echo "date,volume,number,type,rev,link" > ${VOLS}
+dos2unix -q ${VOLS}
 while true
 do
     #COOKIE=`curl -sI "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "PHPSESSID=(\w+)" `
@@ -83,6 +84,7 @@ then
 fi
 dos2unix -q ${VOLS_URLS}
 ./getvol.sh ${VOLS_URLS} >> ${GAZETTES}
+dos2unix -q ${GAZETTES}
 
 echo "Processing volume pages..."
 while read IN
@@ -113,6 +115,7 @@ do
     sed -i 's/<img [^>]\+>//g' ${IN}.out
     # Send through the parser
     ./parse_gaz.py ${IN}.out >> ${GAZETTES_URLS}
+    dos2unix -q ${GAZETTES_URLS}
     rm ${IN} ${IN}.tail ${IN}.out
 done < ${GAZETTES}
 
@@ -126,6 +129,7 @@ then
     exit
 fi
 ./getlinks.sh ${GAZETTES_URLS} >> ${PDFLISTS}
+dos2unix -q ${PDFLISTS}
 
 echo "Processing PDF listing pages..."
 while read IN
