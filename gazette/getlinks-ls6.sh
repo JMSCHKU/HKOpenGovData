@@ -12,7 +12,8 @@ SLEEPSECS=5
 
 while read i
 do
-    COOKIE=`curl -I "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "PHPSESSID=(\w+)" `
+    #COOKIE=`curl -I "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "PHPSESSID=(\w+)" `
+    COOKIE=`curl -sI "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "Set-Cookie: ([^;]+);" | sed 's/Set-Cookie: //g' | sed ':a;N;$!ba;s/\n/ /g'`
     vol=`echo $i | grep -oE "&vol=([0-9]+)" | grep -oE "[0-9]+" `
     no=`echo $i | grep -oE "&no=([0-9]+)" | grep -oE "[0-9]+" `
     extra=`echo $i | grep -oE "extra=([0-9]+)" | grep -oE "[0-9]+" `

@@ -26,7 +26,8 @@ VOLS="vols.${D}.csv"
 echo "date,volume,number,type,rev,link" > ${VOLS}
 while true
 do
-    COOKIE=`curl -sI "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "PHPSESSID=(\w+)" `
+    #COOKIE=`curl -sI "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "PHPSESSID=(\w+)" `
+    COOKIE=`curl -sI "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "Set-Cookie: ([^;]+);" | sed 's/Set-Cookie: //g' | sed ':a;N;$!ba;s/\n/ /g'`
     # Get the TOC page
     IN="toc.${D}.${toc_i}.html"
     curl -sb "${COOKIE}" "${TOC}?page=${toc_i}" -o ${IN}
@@ -37,6 +38,7 @@ do
         if [ ${tries} -gt ${MAX_TRIES} ]
         then
             echo "Tried maximum times (${MAX_TRIES}). Now exiting process..."
+            rm ${VOLS}
             exit
         fi
         echo "file empty: ${IN} (try #${tries})"
@@ -79,6 +81,7 @@ then
     rm ${VOLS}
     exit
 fi
+dos2unix -q ${VOLS_URLS}
 ./getvol.sh ${VOLS_URLS} >> ${GAZETTES}
 
 echo "Processing volume pages..."
@@ -91,6 +94,7 @@ do
         if [ ${tries} -gt ${MAX_TRIES} ]
         then
             echo "Tried maximum times (${MAX_TRIES}). Now exiting process..."
+            rm ${VOLS}
             exit
         fi
         continue

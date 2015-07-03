@@ -16,7 +16,7 @@ do
     then
         continue
     fi
-    COOKIE=`curl -sI "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "PHPSESSID=(\w+)" `
+    COOKIE=`curl -sI "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "Set-Cookie: ([^;]+);" | sed 's/Set-Cookie: //g' | sed ':a;N;$!ba;s/\n/ /g' | sed 's/\s+/ /g' `
     sleep 0.2
     i=`echo $i | sed 's/&amp;/\&/g'`
     vol=`echo $i | grep -oE "&vol=([0-9]+)" | grep -oE "[0-9]+" `
@@ -29,7 +29,7 @@ do
     URL=`echo "http://www.gld.gov.hk/egazette/english/gazette/${i}" | sed 's/&amp;/\&/g'`
     while true
     do
-        curl -s -b "${COOKIE}" "${URL}" -o "${FO}"
+        curl -sb "${COOKIE}" "${URL}" -o "${FO}"
         let tries=${tries}+1
         if [ -s "${FO}" ]
         then

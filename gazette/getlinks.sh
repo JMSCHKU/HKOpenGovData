@@ -43,7 +43,8 @@ do
     then
         LS6=1
     fi
-    COOKIE=`curl -sI "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "PHPSESSID=(\w+)" `
+    #COOKIE=`curl -sI "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "PHPSESSID=(\w+)" `
+    COOKIE=`curl -sI "http://www.gld.gov.hk/egazette/english/gazette/toc.php?Submit=accept" | grep -Eo "Set-Cookie: ([^;]+);" | sed 's/Set-Cookie: //g' | sed ':a;N;$!ba;s/\n/ /g'`
     sleep 0.2
     vol=`echo $i | grep -oE "&vol=([0-9]+)" | grep -oE "[0-9]+" `
     no=`echo $i | grep -oE "&no=([0-9]+)" | grep -oE "[0-9]+" `
